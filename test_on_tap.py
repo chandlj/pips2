@@ -148,7 +148,7 @@ def main(
         log_freq=99, # how often to make image summaries
         max_iters=30, # how many samples to test
         log_dir='./logs_test_on_tap',
-        dataset_location='/orion/u/aharley/datasets/tapvid_davis',
+        dataset_location='/microtel/nfs/datasets/tap/tapvid_davis',
         init_dir='./reference_model',
         device_ids=[0], 
         n_pool=1000, # how long the running averages should be
