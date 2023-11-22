@@ -20,9 +20,10 @@ def load_pips(checkpoint_dir, stride=8):
     model.eval()
     return model
 
-def run_pips(model, video, tracks, iters=8, S_max=8, image_size=(384, 512)):
+def run_pips(model, query_points, tracks, iters=8, S_max=8, image_size=(384, 512)):
     video = torch.from_numpy(video).permute(0, 3, 1, 2).cuda().float()
-    tracks = torch.from_numpy(tracks).permute(1, 0, 2).cuda().float()
+    # tracks = torch.from_numpy(tracks).permute(1, 0, 2).cuda().float()
+    tracks = torch.from_numpy(np.fliplr(query_points[..., 1:])).unsqueeze(0).cuda().float()
 
     S, C, H, W = video.shape
     _, N = tracks.shape
@@ -35,6 +36,7 @@ def run_pips(model, video, tracks, iters=8, S_max=8, image_size=(384, 512)):
 
     trajs_e = tracks[0].repeat(S, 1, 1)
 
+    # Batch inputs
     rgbs = rgbs.unsqueeze(0)
     trajs_e = trajs_e.unsqueeze(0)
 
