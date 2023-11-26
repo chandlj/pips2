@@ -37,11 +37,19 @@ def run_pips(model, video, query_points, iters=8, S_max=8, image_size=(384, 512)
     # Batch inputs
     rgbs = rgbs.unsqueeze(0) # 1,S,C,H,W
 
-    idx = list(range(0, max(S-S_max,1), S_max))
+    cur_frame = 0
+    done = False
     feat_init = None
-    for si in idx:
-        rgb_seq = rgbs[:, si:si+S_max].cuda()
-        traj_seq = trajs_e[:, si:si+S_max].cuda()
+    while not done:
+        end_frame = cur_frame + S_max
+
+        if end_frame > S:
+            diff = end_frame-S
+            end_frame = end_frame-diff
+            cur_frame = max(cur_frame-diff,0)
+
+        traj_seq = trajs_e[:, cur_frame:end_frame].cuda()
+        rgb_seq = rgbs[:, cur_frame:end_frame].cuda()
         S_local = rgb_seq.shape[1]
 
         if feat_init is not None:
@@ -49,8 +57,8 @@ def run_pips(model, video, query_points, iters=8, S_max=8, image_size=(384, 512)
             
         preds, preds_anim, feat_init, _ = model(traj_seq, rgb_seq, iters=iters, feat_init=feat_init, beautify=True)
 
-        trajs_e[:, si:si+S_max] = preds[-1][:, :S_local]
-        trajs_e[:, si+S_max:] = trajs_e[:, si+S_max-1:si+S_max]
+        trajs_e[:, cur_frame:end_frame] = preds[-1][:, :S_local].cpu()
+        trajs_e[:, end_frame:] = trajs_e[:, end_frame-1:end_frame] # update the future with new zero-vel
 
         del preds
         del preds_anim
@@ -58,18 +66,10 @@ def run_pips(model, video, query_points, iters=8, S_max=8, image_size=(384, 512)
         del traj_seq
         torch.cuda.empty_cache()
 
-    if S % S_max != 0:
-        rgb_seq = rgbs[:, idx[-1]+S_max:].cuda()
-        traj_seq = trajs_e[:, idx[-1]+S_max:].cuda()
-        S_local = rgb_seq.shape[1]
-
-        if feat_init is not None:
-            feat_init = [fi[:,:S_local] for fi in feat_init]
-
-        preds, preds_anim, feat_init, _ = model(traj_seq, rgb_seq, iters=iters, feat_init=feat_init, beautify=True)
-
-        trajs_e[:, idx[-1]+S_max:] = preds[-1][:, :S_local]
-        trajs_e[:, idx[-1]+S_max:] = trajs_e[:, idx[-1]+S_max-1:idx[-1]+S_max]
+        if end_frame >= S:
+            done = True
+        else:
+            cur_frame = cur_frame + S_max - 1
 
     predicted_tracks = trajs_e.squeeze(0).cpu().numpy()
     predicted_tracks[..., 0] /= sx
